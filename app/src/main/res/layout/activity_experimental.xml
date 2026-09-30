@@ -102,8 +102,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-
-
         <!-- EQ engine frame size Card (issue #26) -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/expFrameCard"
@@ -290,7 +288,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-
         <!-- Add more EQ bands Card (issue #31) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
@@ -432,54 +429,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Black (AMOLED) theme Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="0dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/black_amoled"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textColor="?attr/colorOnSurface" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/changes_dark_theme_for_amoled_screens"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:paddingTop="4dp" />
-                </LinearLayout>
-
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/expAmoledThemeSwitch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- TV Mode Card (issues #35 / #55) -->
+<!-- TV Mode Card (issues #35 / #55) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -553,7 +503,6 @@
                     android:textColor="?attr/colorPrimary" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
 
         <!-- Experimental DP Engine Card -->
         <com.google.android.material.card.MaterialCardView

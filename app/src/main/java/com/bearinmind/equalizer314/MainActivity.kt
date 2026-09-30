@@ -247,11 +247,8 @@ class  MainActivity : AppCompatActivity() {
                 // Rebuild the live DSP from the restored settings before the UI reloads.
                 startService(Intent(this, EqService::class.java).setAction(EqService.ACTION_RELOAD_PREFS))
                 // Re-apply the restored theme choice, then recreate so all screens, presets, and bindings reload from the new prefs.
-                val light = getSharedPreferences("eq_settings", MODE_PRIVATE).getBoolean("lightTheme", false)
-                androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
-                    if (light) androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
-                    else androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
-                )
+                EqApp.themeStamp++
+                EqApp.applyNightMode(this)
                 recreate()
             } else {
                 android.widget.Toast.makeText(this, getString(R.string.not_a_valid_backup), android.widget.Toast.LENGTH_SHORT).show()

@@ -87,7 +87,6 @@
     <string name="auto_save_presets">Автосохранение пресетов</string>
     <string name="saves_preset_changes_without_having_to">Сохраняет изменения пресета без необходимости перезаписи</string>
     <string name="black_amoled">Чёрный AMOLED</string>
-    <string name="changes_dark_theme_for_amoled_screens">Изменяет тёмную тему на чёрную для AMOLED-экранов</string>
     <string name="remote_eq_mode">Режим удалённого эквалайзера</string>
     <string name="control_this_app_from_another_device">Управляйте этим приложением с другого устройства в сети.</string>
     <string name="off">Выкл.</string>
@@ -189,8 +188,6 @@
     <string name="notification_settings">Настройки уведомлений</string>
     <string name="personalize_the_notification">Персонализировать уведомление</string>
     <string name="control_fft_smoothness_and_other_misc">Управление сглаживанием БПФ и другими настройками спектра</string>
-    <string name="light_theme">Светлая тема</string>
-    <string name="switch_between_light_and_dark_mode">Переключение между светлой и тёмной темой</string>
     <string name="eq">Эквалайзер</string>
     <string name="power">Питание</string>
     <string name="skip_system_sounds">Пропускать системные звуки</string>

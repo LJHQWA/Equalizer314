@@ -5,7 +5,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.bearinmind.equalizer314.state.EqPreferencesManager
 import com.google.android.material.materialswitch.MaterialSwitch
 
-/** Groups UI presentation settings: Spectrum Control, Light Theme (EQ mode toggles land here too). */
+/** Groups UI presentation settings: Spectrum Control, Theme picker (EQ mode toggles land here too). */
 class UiEqModesActivity : AppCompatActivity() {
 
     private lateinit var eqPrefs: EqPreferencesManager
@@ -26,21 +26,69 @@ class UiEqModesActivity : AppCompatActivity() {
             overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
         }
 
-        // Theme toggle: switch ON = light. setDefaultNightMode recreates all live
-        // activities; EqApp re-applies the saved choice on the next cold start.
-        val themeSwitch = findViewById<MaterialSwitch>(R.id.themeSwitch)
-        themeSwitch.isChecked = eqPrefs.getLightTheme()
-        themeSwitch.setOnCheckedChangeListener { _, isChecked ->
-            eqPrefs.saveLightTheme(isChecked)
-            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
-                if (isChecked) androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
-                else androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
-            )
-        }
+        // Theme picker (issue #125).
+        findViewById<android.widget.TextView>(R.id.themeValueText).text = themeLabel(EqApp.themeMode(this))
+        findViewById<android.view.View>(R.id.themeCard).setOnClickListener { showThemeDialog() }
     }
 
-    // Change EQ Modes popup (issue #77): preview + drag-reorderable mode toggles,
-    // same structure as the Notification Settings dialog. MainActivity applies on resume.
+    private fun themeLabel(mode: String): String = getString(when (mode) {
+        EqApp.THEME_LIGHT -> R.string.theme_light
+        EqApp.THEME_AMOLED -> R.string.black_amoled
+        EqApp.THEME_SYSTEM -> R.string.theme_follow_system
+        else -> R.string.theme_dark
+    })
+
+    private fun showThemeDialog() {
+        if (isFinishing) return
+        val density = resources.displayMetrics.density
+        val current = EqApp.themeMode(this)
+        val root = styledDialogRoot()
+        root.addView(styledDialogTitle(getString(R.string.theme)))
+        root.addView(styledDialogDivider())
+        val dialog = android.app.AlertDialog.Builder(this, R.style.Theme_Equalizer314_Dialog).setView(root).create()
+        for (mode in listOf(EqApp.THEME_SYSTEM, EqApp.THEME_LIGHT, EqApp.THEME_DARK, EqApp.THEME_AMOLED)) {
+            val selected = mode == current
+            root.addView(android.widget.TextView(this).apply {
+                text = themeLabel(mode)
+                textSize = 16f
+                setTextColor(if (selected) 0xFFFFFFFF.toInt() else 0xFFDDDDDD.toInt())
+                setPadding((16 * density).toInt(), (14 * density).toInt(), (16 * density).toInt(), (14 * density).toInt())
+                // Selected row gets the brighter outline, as in the language picker.
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = 12 * density
+                    if (selected) setStroke((2 * density).toInt(),
+                        com.google.android.material.color.MaterialColors.getColor(root, androidx.appcompat.R.attr.colorPrimary))
+                    else setStroke((1 * density).toInt(), 0xFF444444.toInt())
+                }
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (8 * density).toInt() }
+                setOnClickListener {
+                    dialog.dismiss()
+                    if (mode != current) applyTheme(mode)
+                }
+            })
+        }
+        root.addView(styledDialogButton(getString(R.string.cancel), isCancel = true).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (4 * density).toInt() }
+            setOnClickListener { dialog.dismiss() }
+        })
+        dialog.show()
+    }
+
+    /** Save + apply; the stamp rebuilds open screens (Black ↔ Dark keeps the same night mode). */
+    private fun applyTheme(mode: String) {
+        EqApp.saveThemeMode(this, mode)
+        EqApp.themeStamp++
+        EqApp.applyNightMode(this)
+        recreate()
+    }
+
+    // Change EQ Modes popup (issue #77): preview + drag-reorderable toggles; MainActivity applies on resume.
     private fun showEqModesDialog() {
         if (isFinishing) return
         val density = resources.displayMetrics.density

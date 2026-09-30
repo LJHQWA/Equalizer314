@@ -79,7 +79,7 @@ class LanguageActivity : AppCompatActivity() {
     /** res/values-[tag] present? Baseline is explicit English, never the live config, or the active language hides itself. */
     private fun hasTranslation(tag: String): Boolean {
         if (tag == "en") return true
-        val probes = intArrayOf(R.string.change_language_and_translations_here, R.string.backup_and_restore, R.string.reset)
+        val probes = intArrayOf(R.string.system_default, R.string.backup_and_restore, R.string.reset)
         val english = resourcesFor(Locale.ENGLISH)
         val candidate = resourcesFor(Locale.forLanguageTag(tag))
         return probes.any { candidate.getString(it) != english.getString(it) }

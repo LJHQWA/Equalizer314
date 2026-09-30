@@ -358,7 +358,6 @@
     <string name="device_key_wired">Com fio</string>
     <string name="device_key_speaker">Alto-falante</string>
     <string name="language">Idioma</string>
-    <string name="change_language_and_translations_here">Mude o idioma e as traduções aqui</string>
     <string name="system_default">Padrão do sistema</string>
     <string name="no_languages_match">Nenhum idioma corresponde</string>
     <plurals name="n_languages">

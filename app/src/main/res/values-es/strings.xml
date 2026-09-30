@@ -358,7 +358,6 @@
     <string name="device_key_wired">Cable</string>
     <string name="device_key_speaker">Altavoz</string>
     <string name="language">Idioma</string>
-    <string name="change_language_and_translations_here">Cambia el idioma y las traducciones aquí</string>
     <string name="system_default">Predeterminado del sistema</string>
     <string name="no_languages_match">Ningún idioma coincide</string>
     <plurals name="n_languages">

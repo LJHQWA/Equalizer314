@@ -1,0 +1,6 @@
+- New theme picker (issue #125): Light, Dark, Black AMOLED and a new Follow system option all live under Settings > EQ Modes & UI. Follow system switches along with your phone's dark mode.
+- Undo and redo work in every mode (issue #120): Parametric, Graphic and Table step back through each edit (dragging points, typed values, filter types, presets and resets). Simple EQ's undo, redo and reset now save right away.
+- EqualizerAPO exports keep their Q values again (issues #100 and #114).
+- Device switching: on Android 13+ the bound preset applies the moment a device connects instead of on the first sound, and switching devices no longer adds four phantom 0 dB filters or turns disabled bands back on.
+- Updated Русский and Українська translations from reallystates, and the remaining in-app text can be translated now.
+- Fixes: a crash when re-tapping the Simple tab, and generated target-curve EQs writing the preamp with a comma in some languages (which APO couldn't read).

@@ -87,7 +87,10 @@
     <string name="auto_save_presets">Auto-save presets</string>
     <string name="saves_preset_changes_without_having_to">Saves preset changes without having to overwrite</string>
     <string name="black_amoled">Black AMOLED</string>
-    <string name="changes_dark_theme_for_amoled_screens">Changes dark theme for AMOLED screens</string>
+    <string name="theme">Theme</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_follow_system">Follow system</string>
     <string name="remote_eq_mode">Remote EQ Mode</string>
     <string name="control_this_app_from_another_device">Control this app from another device on network.</string>
     <string name="off">Off</string>
@@ -189,8 +192,6 @@
     <string name="notification_settings">Notification Settings</string>
     <string name="personalize_the_notification">Personalize the notification</string>
     <string name="control_fft_smoothness_and_other_misc">Control FFT smoothness &amp; other misc spectrum settings</string>
-    <string name="light_theme">Light Theme</string>
-    <string name="switch_between_light_and_dark_mode">Switch between light &amp; dark mode</string>
     <string name="eq">EQ</string>
     <string name="power">Power</string>
     <string name="skip_system_sounds">Skip system sounds</string>
@@ -358,7 +359,6 @@
     <string name="device_key_wired">Wired</string>
     <string name="device_key_speaker">Speaker</string>
     <string name="language">Language</string>
-    <string name="change_language_and_translations_here">Change language &amp; translations here</string>
     <string name="system_default">System default</string>
     <string name="no_languages_match">No languages match</string>
     <plurals name="n_languages">

@@ -24,7 +24,6 @@ class ExperimentalActivity : AppCompatActivity() {
         setupCompatMode()
         setupMbcVolComp()
         setupPresetAutosave()
-        setupAmoledTheme()
         setupTvMode()
 
         // Hide the legacy "Experimental DP Engine" switch row; the view stays so the card structure holds.
@@ -139,17 +138,6 @@ class ExperimentalActivity : AppCompatActivity() {
         val switch = findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.expPresetAutosaveSwitch)
         switch.isChecked = eqPrefs.getPresetAutosave()
         switch.setOnCheckedChangeListener { _, isChecked -> eqPrefs.savePresetAutosave(isChecked) }
-    }
-
-    // Black (AMOLED) theme: EqApp overlays it at activity creation; bump the stamp so live screens rebuild.
-    private fun setupAmoledTheme() {
-        val switch = findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.expAmoledThemeSwitch)
-        switch.isChecked = eqPrefs.getAmoledTheme()
-        switch.setOnCheckedChangeListener { _, isChecked ->
-            eqPrefs.saveAmoledTheme(isChecked)
-            EqApp.themeStamp++
-            recreate()
-        }
     }
 
     // MBC thresholds follow the media volume (applies live via EqService).

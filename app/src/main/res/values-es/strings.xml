@@ -86,7 +86,10 @@
     <string name="auto_save_presets">Guardar presets automáticamente</string>
     <string name="saves_preset_changes_without_having_to">Guarda los cambios del preset sin tener que sobrescribir</string>
     <string name="black_amoled">Negro AMOLED</string>
-    <string name="changes_dark_theme_for_amoled_screens">Cambia el tema oscuro para pantallas AMOLED</string>
+    <string name="theme">Tema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="theme_follow_system">Seguir al sistema</string>
     <string name="remote_eq_mode">Modo EQ remoto</string>
     <string name="control_this_app_from_another_device">Controla esta app desde otro dispositivo de la red.</string>
     <string name="off">Apagado</string>
@@ -188,8 +191,6 @@
     <string name="notification_settings">Ajustes de la notificación</string>
     <string name="personalize_the_notification">Personaliza la notificación</string>
     <string name="control_fft_smoothness_and_other_misc">Controla el suavizado de la FFT y otros ajustes del espectro</string>
-    <string name="light_theme">Tema claro</string>
-    <string name="switch_between_light_and_dark_mode">Cambia entre el modo claro y el oscuro</string>
     <string name="eq">EQ</string>
     <string name="power">Encendido</string>
     <string name="skip_system_sounds">Omitir sonidos del sistema</string>
@@ -357,7 +358,6 @@
     <string name="device_key_wired">Cable</string>
     <string name="device_key_speaker">Altavoz</string>
     <string name="language">Idioma</string>
-    <string name="change_language_and_translations_here">Cambia el idioma y las traducciones aquí</string>
     <string name="system_default">Predeterminado del sistema</string>
     <string name="no_languages_match">Ningún idioma coincide</string>
     <plurals name="n_languages">

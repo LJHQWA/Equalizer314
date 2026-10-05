@@ -331,16 +331,16 @@ class  MainActivity : AppCompatActivity() {
     private lateinit var bandToggleManager: BandToggleManager
     private val visualizerHelper = com.bearinmind.equalizer314.audio.VisualizerHelper()
 
-    private fun reloadEqFromPrefs() {
+    /** [simpleFromPrefs]: the device-switch service already wrote Simple's bars — reload them, don't convert. */
+    private fun reloadEqFromPrefs(simpleFromPrefs: Boolean = false) {
         stateManager.initEq(eqGraphView)
         stateManager.preampGainDb = eqPrefs.getPreampGain()
         stateManager.preampLeftDb = eqPrefs.getPreampLeft()
         stateManager.preampRightDb = eqPrefs.getPreampRight()
         preampSlider.value = stateManager.getActivePreamp().coerceIn(-preampRange(), preampRange())
         preampText.setText(String.format("%.1f", stateManager.getActivePreamp()))
-        eqGraphView.updateBandLevels()
-        bandToggleManager.setupToggles()
-        stateManager.pushEqUpdate()
+        // Graph, toggles, inputs, Graphic sliders, Table (or Simple's bars) + push, issue #126.
+        refreshEqViews(simpleFromPrefs)
         val preset = eqPrefs.getPresetName()
         presetDropdown.setText(presetLabelOf(preset), false)
         updateAutoEqStatus()
@@ -348,7 +348,6 @@ class  MainActivity : AppCompatActivity() {
         if (stateManager.currentEqUiMode == EqUiMode.TABLE) {
             bandToggleGroup.visibility = View.GONE
             bandToggleGroup2.visibility = View.GONE
-            tableController.buildTable()
         }
         // Loaded from outside (preset screens, device switch): undo starts fresh here.
         stateManager.resetUndoHistory()
@@ -676,7 +675,7 @@ class  MainActivity : AppCompatActivity() {
         eqPrefs.savePresetName(name)
         presetDropdown.setText(name, false)
         stateManager.initBandSlots()
-        rebindActiveEq()
+        refreshEqViews()
         updateDevicePresetStatus()
     }
 
@@ -685,8 +684,7 @@ class  MainActivity : AppCompatActivity() {
             if (intent?.action == com.bearinmind.equalizer314.audio.RouteSwitchCoordinator.ACTION_ROUTE_PRESET_APPLIED) {
                 // A device-bound preset landed in prefs — pull it into the graph, not just the chip.
                 stateManager.lastPresetApplyMs = System.currentTimeMillis()
-                reloadEqFromPrefs()
-                rebindActiveEq()
+                reloadEqFromPrefs(simpleFromPrefs = true)
                 presetDropdown.setText(presetLabelOf(eqPrefs.getPresetName()), false)
             }
             updateDevicePresetStatus()
@@ -882,8 +880,7 @@ class  MainActivity : AppCompatActivity() {
         // A saved mode whose tab is disabled lands on Parametric (issue #77).
         val savedMode = try { EqUiMode.valueOf(eqPrefs.getEqUiMode()) } catch (_: Exception) { EqUiMode.PARAMETRIC }
             .let { if (it == EqUiMode.GRAPHIC && !eqPrefs.getEqModeEnabled("graphic")) EqUiMode.PARAMETRIC else it }
-        val launchMode =
-            if (eqPrefs.getSimpleEqEnabled() && eqPrefs.getEqModeEnabled("simple")) EqUiMode.SIMPLE else savedMode
+        val launchMode = if (eqPrefs.isSimpleModeActive()) EqUiMode.SIMPLE else savedMode
         switchEqUiMode(launchMode)
         applyEqModeTabs()
         pageEq.viewTreeObserver.addOnGlobalLayoutListener { fitToViewport() }
@@ -2196,9 +2193,8 @@ class  MainActivity : AppCompatActivity() {
                         Intent(com.bearinmind.equalizer314.audio.EqService.ACTION_NOTIFICATION_REFRESH)
                             .setPackage(packageName)
                     )
-                    // Bands and preamp in one write; the old stop/start left audio unprocessed meanwhile (issue #106).
-                    if (stateManager.isProcessing) stateManager.pushEqUpdate()
-                    refreshChannelPopoutDim()
+                    // Redraw every view (issue #126); bands + preamp go out in one write (#106).
+                    refreshEqViews()
                     // Close picker with animation
                     presetPickerOpen = false
                     eqControlsContainerLocal.visibility = android.view.View.VISIBLE
@@ -2790,9 +2786,7 @@ class  MainActivity : AppCompatActivity() {
             val presetName = presetKeyOf(parent.getItemAtPosition(position) as? String ?: return@setOnItemClickListener)
             stateManager.loadPreset(presetName, eqGraphView)
             presetDropdown.setText(presetLabelOf(presetName), false)
-            bandToggleManager.updateIcons()
-            if (stateManager.currentEqUiMode == EqUiMode.TABLE) tableController.buildTable()
-            if (stateManager.currentEqUiMode == EqUiMode.GRAPHIC) graphicController.buildSliders(graphicController.targetCardHeight)
+            refreshEqViews()
         }
 
         // Graph callbacks
@@ -2920,10 +2914,16 @@ class  MainActivity : AppCompatActivity() {
         stateManager.persistLeftRightIfCse()
         if (structureChanged) {
             stateManager.initBandSlots()
-            bandToggleManager.setupToggles()
-            if (stateManager.currentEqUiMode == EqUiMode.TABLE) tableController.buildTable()
+            refreshEqViews()
         } else {
             eqGraphView.updateBandLevels()
+            // Live remote drags: update the cards / inputs in place instead of rebuilding (issue #126).
+            when (stateManager.currentEqUiMode) {
+                EqUiMode.GRAPHIC -> graphicController.updateSliderValues()
+                EqUiMode.SIMPLE -> simpleEqController.adoptLoadedEq()
+                else -> {}
+            }
+            updateBandInputs(stateManager.selectedBandIndex)
         }
         stateManager.preampGainDb =
             if (obj.has("preamp")) obj.getDouble("preamp").toFloat() else 0f
@@ -3986,9 +3986,7 @@ class  MainActivity : AppCompatActivity() {
                 setOnClickListener {
                     stateManager.loadPreset(presetName, eqGraphView)
                     presetDropdown.setText(presetLabelOf(presetName), false)
-                    bandToggleManager.updateIcons()
-                    if (stateManager.currentEqUiMode == EqUiMode.TABLE) tableController.buildTable()
-                    if (stateManager.currentEqUiMode == EqUiMode.GRAPHIC) graphicController.buildSliders(graphicController.targetCardHeight)
+                    refreshEqViews()
                     bottomSheet.dismiss()
                 }
             }
@@ -4841,10 +4839,19 @@ class  MainActivity : AppCompatActivity() {
         refreshChannelPopoutDim()
     }
 
-    /** Redraw every EQ view after undo/redo swapped the bands underneath them (issue #120). */
-    private fun refreshAfterUndo() {
+    /** Redraw every EQ view after the bands were swapped underneath them (presets #126, undo #120); Simple rebuilds its bars. */
+    private fun refreshEqViews(simpleFromPrefs: Boolean = false) {
+        if (stateManager.currentEqUiMode == EqUiMode.SIMPLE) {
+            if (simpleFromPrefs) simpleEqController.reloadFromPrefs() else simpleEqController.adoptLoadedEq()
+            return
+        }
         rebindActiveEq()
         if (stateManager.currentEqUiMode == EqUiMode.GRAPHIC) graphicController.buildSliders(graphicController.targetCardHeight)
+    }
+
+    /** Redraw after undo/redo, then adopt the settled state as the current entry (issue #120). */
+    private fun refreshAfterUndo() {
+        refreshEqViews()
         stateManager.settleUndoPoint()
     }
 

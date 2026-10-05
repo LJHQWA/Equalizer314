@@ -879,6 +879,20 @@ class SimpleEqController(
         barsView?.setAllGains(gains)
     }
 
+    /** Rebuild the 10 bars from the saved Simple gains (a device switch's service already wrote them). */
+    fun reloadFromPrefs() {
+        configureParametricEq()
+        syncFromEq()
+        miniGraph?.invalidate()
+        saveSnapshot()
+    }
+
+    /** A preset loaded outside Simple's picker replaced the EQ: rebuild the 10 bars from it (issue #126). */
+    fun adoptLoadedEq() {
+        eqPrefs.saveSimpleEqGains(EqPreferencesManager.simpleGainsFor(state.parametricEq))
+        reloadFromPrefs()
+    }
+
     fun saveGains() {
         val eq = state.parametricEq
         val gains = FloatArray(FREQUENCIES.size) { i ->

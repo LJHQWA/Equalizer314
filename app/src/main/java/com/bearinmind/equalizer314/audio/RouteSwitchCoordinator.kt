@@ -229,8 +229,18 @@ class RouteSwitchCoordinator(
             }
         }
 
+        // Simple mode shows and plays its 10-bar version: keep a snapshot's own bars, else convert the preset (issue #126).
+        val simpleGains = if (eqPrefs.isSimpleModeActive()) {
+            preset.optJSONArray("simpleEqGains")?.let { a -> FloatArray(a.length()) { a.getDouble(it).toFloat() } }
+                ?: (preset.optJSONArray("bands") ?: preset.optJSONArray("leftBands"))
+                    ?.let { EqPreferencesManager.simpleGainsFor(EqPreferencesManager.eqFromBands(it)) }
+        } else null
+        simpleGains?.let { eqPrefs.saveSimpleEqGains(it) }
+
         if (dynamicsManager.isActive) {
-            if (hasLeftRight) {
+            if (simpleGains != null) {
+                dynamicsManager.updateFromEqualizer(EqPreferencesManager.simpleEqFor(simpleGains))
+            } else if (hasLeftRight) {
                 val leftEq = EqPreferencesManager.eqFromBands(preset.getJSONArray("leftBands"))
                 val rightEq = EqPreferencesManager.eqFromBands(preset.getJSONArray("rightBands"))
                 dynamicsManager.updateFromEqualizers(leftEq, rightEq)

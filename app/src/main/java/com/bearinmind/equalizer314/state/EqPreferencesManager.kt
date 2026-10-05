@@ -66,6 +66,25 @@ class EqPreferencesManager(context: Context) {
         // Mirrors SimpleEqController.FREQUENCIES/.Q — change together.
         private val SIMPLE_FREQS = floatArrayOf(31f, 63f, 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f)
         private const val SIMPLE_Q = 1.414
+
+        /** Simple's 10 bar gains for any EQ: a native Simple layout keeps its gains, anything else samples the curve at the bar frequencies. */
+        fun simpleGainsFor(eq: ParametricEqualizer): FloatArray {
+            val bands = eq.getAllBands()
+            val native = bands.size == SIMPLE_FREQS.size && bands.indices.all { i ->
+                bands[i].filterType == BiquadFilter.FilterType.BELL && kotlin.math.abs(bands[i].frequency - SIMPLE_FREQS[i]) <= 1f
+            }
+            return FloatArray(SIMPLE_FREQS.size) { i ->
+                val gain = if (native) (if (bands[i].enabled) bands[i].gain else 0f) else eq.getFrequencyResponse(SIMPLE_FREQS[i])
+                gain.coerceIn(-12f, 12f)
+            }
+        }
+
+        /** The 10-band EQ Simple mode plays for [gains]. */
+        fun simpleEqFor(gains: FloatArray): ParametricEqualizer = ParametricEqualizer().apply {
+            clearBands()
+            SIMPLE_FREQS.forEachIndexed { i, f -> addBand(f, gains.getOrElse(i) { 0f }, BiquadFilter.FilterType.BELL, SIMPLE_Q) }
+            isEnabled = true
+        }
     }
 
     /** Per-app → preset binding for sessions that broadcast OPEN_AUDIO_EFFECT_CONTROL_SESSION. */
@@ -624,8 +643,9 @@ class EqPreferencesManager(context: Context) {
     // Simple EQ
     fun saveSimpleEqEnabled(enabled: Boolean) { prefs.edit().putBoolean("simpleEqEnabled", enabled).apply() }
     fun getSimpleEqEnabled(): Boolean = prefs.getBoolean("simpleEqEnabled", false)
+    /** Simple is the live mode only while its tab is enabled too (MainActivity's launch test). */
+    fun isSimpleModeActive(): Boolean = getSimpleEqEnabled() && getEqModeEnabled("simple")
 
-    // Light/dark theme (dark default) — EqApp reads this key raw at process start; keep the name in sync.
     fun saveSimpleEqGains(gains: FloatArray) {
         val arr = JSONArray()
         for (g in gains) arr.put(g.toDouble())
@@ -725,35 +745,7 @@ class EqPreferencesManager(context: Context) {
     fun getSimpleEqPresetGains(name: String): FloatArray? {
         val str = customPresetsPrefs.getString("preset_$name", null) ?: return null
         return try {
-            val obj = JSONObject(str)
-            val arr = obj.getJSONArray("bands")
-
-            // Native 10-band Simple preset: read gains directly so save→load round-trips exactly.
-            if (arr.length() == SIMPLE_FREQS.size) {
-                var native = true
-                val direct = FloatArray(SIMPLE_FREQS.size)
-                for (i in 0 until arr.length()) {
-                    val b = arr.getJSONObject(i)
-                    val freq = b.getDouble("frequency").toFloat()
-                    val isBell = (b.optString("filterType", "BELL") == BiquadFilter.FilterType.BELL.name)
-                    if (!isBell || kotlin.math.abs(freq - SIMPLE_FREQS[i]) > 1f) { native = false; break }
-                    direct[i] = b.getDouble("gain").toFloat().coerceIn(-12f, 12f)
-                }
-                if (native) return direct
-            }
-
-            // Arbitrary preset: sample the composite response at the Simple frequencies.
-            val eq = ParametricEqualizer()
-            eq.clearBands()
-            for (i in 0 until arr.length()) {
-                val b = arr.getJSONObject(i)
-                val ft = try { BiquadFilter.FilterType.valueOf(b.getString("filterType")) }
-                         catch (_: Exception) { BiquadFilter.FilterType.BELL }
-                eq.addBand(b.getDouble("frequency").toFloat(), b.getDouble("gain").toFloat(), ft, b.getDouble("q"))
-            }
-            FloatArray(SIMPLE_FREQS.size) { i ->
-                eq.getFrequencyResponse(SIMPLE_FREQS[i]).coerceIn(-12f, 12f)
-            }
+            simpleGainsFor(eqFromBands(JSONObject(str).getJSONArray("bands")))
         } catch (_: Exception) { null }
     }
 
@@ -890,6 +882,8 @@ class EqPreferencesManager(context: Context) {
                     put("preampLeft", getPreampLeft().toDouble())
                     put("preampRight", getPreampRight().toDouble())
                 }
+                // Simple mode's own bars, so switching back to this state restores them exactly.
+                if (isSimpleModeActive()) getSimpleEqGains()?.let { g -> put("simpleEqGains", JSONArray(g.map { it.toDouble() })) }
             }
         }.getOrNull()
     }

@@ -229,16 +229,17 @@ class RouteSwitchCoordinator(
             }
         }
 
-        // Simple mode shows and plays its 10-bar version: keep a snapshot's own bars, else convert the preset (issue #126).
-        val simpleGains = if (eqPrefs.isSimpleModeActive()) {
-            preset.optJSONArray("simpleEqGains")?.let { a -> FloatArray(a.length()) { a.getDouble(it).toFloat() } }
-                ?: (preset.optJSONArray("bands") ?: preset.optJSONArray("leftBands"))
-                    ?.let { EqPreferencesManager.simpleGainsFor(EqPreferencesManager.eqFromBands(it)) }
-        } else null
+        // Simple mode: the preset also becomes the EQ the other modes return to; the bars show + play its 10-bar version (issue #126).
+        val simpleActive = eqPrefs.isSimpleModeActive()
+        val liveBands = if (hasLeftRight) preset.getJSONArray("leftBands") else preset.getJSONArray("bands")
+        if (simpleActive) eqPrefs.saveAdvancedEqBackup(liveBands.toString())
+        // A snapshot's own bars always come back exactly, even if Simple was left since.
+        val simpleGains = preset.optJSONArray("simpleEqGains")?.let { a -> FloatArray(a.length()) { a.getDouble(it).toFloat() } }
+            ?: if (simpleActive) EqPreferencesManager.simpleGainsFor(EqPreferencesManager.eqFromBands(liveBands)) else null
         simpleGains?.let { eqPrefs.saveSimpleEqGains(it) }
 
         if (dynamicsManager.isActive) {
-            if (simpleGains != null) {
+            if (simpleActive && simpleGains != null) {
                 dynamicsManager.updateFromEqualizer(EqPreferencesManager.simpleEqFor(simpleGains))
             } else if (hasLeftRight) {
                 val leftEq = EqPreferencesManager.eqFromBands(preset.getJSONArray("leftBands"))

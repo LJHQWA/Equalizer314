@@ -1140,6 +1140,11 @@ class EqService : Service() {
     }
 
     private fun loadPersistedParametricEq(): ParametricEqualizer? {
+        // Simple mode plays its 10 bars; "bands" holds the hidden advanced EQ.
+        val p = EqPreferencesManager(this)
+        if (p.isSimpleModeActive()) {
+            return EqPreferencesManager.simpleEqFor(runCatching { p.getSimpleEqGains() }.getOrNull() ?: FloatArray(0))
+        }
         val prefs = getSharedPreferences("eq_settings", Context.MODE_PRIVATE)
         val str = runCatching { prefs.getString("bands", null) }.getOrNull() ?: return null
         return runCatching {

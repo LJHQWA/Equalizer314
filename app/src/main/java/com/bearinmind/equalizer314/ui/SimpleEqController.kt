@@ -887,8 +887,9 @@ class SimpleEqController(
         saveSnapshot()
     }
 
-    /** A preset loaded outside Simple's picker replaced the EQ: rebuild the 10 bars from it (issue #126). */
+    /** A preset loaded outside Simple's picker replaced the EQ: it becomes the EQ the other modes return to, the bars show its 10-bar version (issue #126). */
     fun adoptLoadedEq() {
+        eqPrefs.saveAdvancedEqBackup(eqPrefs.bandsToJson(state.parametricEq).toString())
         eqPrefs.saveSimpleEqGains(EqPreferencesManager.simpleGainsFor(state.parametricEq))
         reloadFromPrefs()
     }

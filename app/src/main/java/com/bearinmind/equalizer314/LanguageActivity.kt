@@ -27,6 +27,7 @@ class LanguageActivity : AppCompatActivity() {
         Triple("pt", "Português", "Portuguese"),
         Triple("ru", "Русский", "Russian"),
         Triple("uk", "Українська", "Ukrainian"),
+        Triple("zh", "简体中文", "Chinese (Simplified)"),
     )
 
     private lateinit var listContainer: LinearLayout

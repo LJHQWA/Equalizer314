@@ -4211,8 +4211,11 @@ class  MainActivity : AppCompatActivity() {
     /** Tag to the language's own name. One line per values-XX folder; absent ones are filtered out below. */
     private val appLanguages = listOf(
         "en" to "English",
+        "es" to "Espa\u00f1ol",
+        "pt" to "Portugu\u00eas",
         "ru" to "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
         "uk" to "\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430",
+        "zh" to "\u7b80\u4f53\u4e2d\u6587",
     )
 
     private fun setupLanguagePicker() {

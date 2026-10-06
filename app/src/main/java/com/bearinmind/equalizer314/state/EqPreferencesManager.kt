@@ -921,8 +921,24 @@ class EqPreferencesManager(context: Context) {
 
     /** True when the persisted bands/preamp no longer match pool preset [presetName]; false when it isn't a pool preset. */
     fun isLiveStateEditedFrom(presetName: String): Boolean {
+        // Simple mode: the bars are the live EQ ("bands" stays the hidden advanced one).
+        if (isSimpleModeActive()) {
+            val bars = runCatching { getSimpleEqGains() }.getOrNull() ?: return false
+            return isSimpleEditedFrom(presetName, bars, getPreampGain())
+        }
         val live = prefs.getString("bands", null)?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return false
         return isEditedFrom(presetName, live, getPreampGain())
+    }
+
+    /** Simple bars vs pool preset [presetName]'s 10-bar version (as a device/app switch loads it), plus preamp; false when it isn't a pool preset. */
+    private fun isSimpleEditedFrom(presetName: String, liveGains: FloatArray, livePreamp: Float): Boolean {
+        val preset = getCustomPresetJson(presetName)?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return false
+        val lr = preset.optBoolean("channelSideEqEnabled", false) && preset.has("leftBands") && preset.has("rightBands")
+        val bands = (if (lr) preset.optJSONArray("leftBands") else preset.optJSONArray("bands")) ?: return false
+        if (abs(preset.optDouble("preamp", 0.0) - livePreamp) > 0.01) return true
+        val ref = simpleGainsFor(eqFromBands(bands))
+        // 0.05 dB: a bar drag snaps to 0.1 dB steps, untouched bars keep the converted values exactly.
+        return ref.indices.any { abs(ref[it] - liveGains.getOrElse(it) { 0f }) > 0.05f }
     }
 
     fun isEditedFrom(presetName: String, liveBands: JSONArray, livePreamp: Float): Boolean {

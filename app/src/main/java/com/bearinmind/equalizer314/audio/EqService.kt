@@ -331,7 +331,7 @@ class EqService : Service() {
         dynamicsManager.setEnabled(true)
     }
 
-    /** Drop the per-session effects but keep a toggled-on reverb: it runs independently of the EQ's power state. */
+    /** Drop the per-session effects but keep a toggled-on reverb across a DP restart (power stays on). */
     private fun releaseSessionEffectsKeepingReverb() {
         sessionEffects?.releaseAll()
         sessionEffects?.applyReverbParamsToAll()
@@ -708,9 +708,9 @@ class EqService : Service() {
             ACTION_STOP -> {
                 manualOverrideDeviceKey = null
                 dynamicsManager.stop()
-                // Session mode: drop the per-app effects but keep the tracked sessions for the UI.
+                // Power off is the master switch: per-app effects and a toggled-on reverb stop too (issue #127); Session mode keeps the tracked sessions for the UI.
                 if (EqPreferencesManager(this).getAudioRoutingMode() == 1) sessionEffects?.setArmed(false)
-                else releaseSessionEffectsKeepingReverb()
+                else sessionEffects?.releaseAll()
                 // Persist power-off so tile/notification taps sync when MainActivity is gone.
                 EqPreferencesManager(this).savePowerState(false)
                 setDpRunning(false)
@@ -741,7 +741,8 @@ class EqService : Service() {
                     // Tile tap while running — toggle off, service stays alive for Turn On.
                     manualOverrideDeviceKey = null
                     dynamicsManager.stop()
-                    releaseSessionEffectsKeepingReverb()
+                    // Reverb included — power off is the master switch (issue #127).
+                    sessionEffects?.releaseAll()
                     EqPreferencesManager(this).savePowerState(false)
                     setDpRunning(false)
                     showDpStateToast(started = false)

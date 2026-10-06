@@ -274,8 +274,8 @@ class SessionEffectManager(private val context: Context) {
     @Synchronized
     fun applyReverbParamsToAll() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
-        // Reverb follows the EQ's routing: per session in Session-based, session 0 in System-wide.
-        val reverbOn = eqPrefs.isAudioEffectEnabled(EFFECT_REVERB_NAME)
+        // Reverb follows the EQ's routing: per session in Session-based, session 0 in System-wide; power off keeps it off (issue #127).
+        val reverbOn = eqPrefs.isAudioEffectEnabled(EFFECT_REVERB_NAME) && eqPrefs.getPowerState()
         if (!reverbOn) {
             for ((_, r) in reverbs) {
                 try { r.release() } catch (_: Throwable) {}
@@ -331,11 +331,7 @@ class SessionEffectManager(private val context: Context) {
         }
     }
 
-    /**
-     * AOSP's reverb takes reflectionsLevel/reflectionsDelay/reverbDelay and then discards them, and
-     * hidden-API rules block reading our own insert effect back. Probe a throwaway EnvironmentalReverb
-     * on an unused session instead: same engine, public getters, nothing in the output path.
-     */
+    /** AOSP's reverb accepts then drops reflections/reverb delay and our insert can't be read back — probe a throwaway EnvironmentalReverb on an unused session (same engine, public getters). */
     private fun probeReverbEngine() {
         if (reverbEngineProbed) return
         reverbEngineProbed = true

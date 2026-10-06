@@ -306,6 +306,9 @@ class EqGraphView @JvmOverloads constructor(
         for (i in bands.indices) {
             bandPoints.add(BandPoint(i, bands[i].frequency, bands[i].gain))
         }
+        // A smaller EQ (reset, preset, channel) must not keep a selection past its last band (issue #129).
+        if ((activeBandIndex ?: -1) >= bandPoints.size) activeBandIndex = null
+        if ((lastTapBandIndex ?: -1) >= bandPoints.size) lastTapBandIndex = null
 
         invalidate()
     }
@@ -1480,7 +1483,8 @@ class EqGraphView @JvmOverloads constructor(
                     cancelLongPressTimer()
                 }
 
-                activeBandIndex?.let {
+                // A drag that starts off the points moves the selected band — only while that band still exists (issue #129).
+                activeBandIndex?.takeIf { it in bandPoints.indices }?.let {
                     if (!isDragging) {
                         if (distance < dragThreshold) return true
                         isDragging = true
@@ -1542,7 +1546,7 @@ class EqGraphView @JvmOverloads constructor(
 
     private fun updatePointPosition(x: Float, y: Float) {
         activeBandIndex?.let { index ->
-            val point = bandPoints[index]
+            val point = bandPoints.getOrNull(index) ?: return
             val vPad = 80f
             val graphWidth = width.toFloat()
             val graphHeight = height - 2 * vPad

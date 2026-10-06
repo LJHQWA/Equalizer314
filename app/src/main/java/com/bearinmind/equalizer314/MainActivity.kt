@@ -2657,13 +2657,16 @@ class  MainActivity : AppCompatActivity() {
                 for (i in 0..3) {
                     eq.addBand(defaultFreqs[i], 0f, com.bearinmind.equalizer314.dsp.BiquadFilter.FilterType.BELL)
                 }
-                eqGraphView.setParametricEqualizer(eq)
                 stateManager.eqPrefs.saveState(eq)
                 // Reset wipes the shared EQ — drop any stored L/R divergence so re-enabling CSE forks from the fresh defaults.
                 stateManager.eqPrefs.clearLeftRightBands()
                 stateManager.initBandSlots()
-                bandToggleManager.setupToggles()
-                if (stateManager.isProcessing) stateManager.pushEqUpdate()
+                // Redraw every view and move the selection onto a band that still exists (issue #129); pushes the EQ too.
+                refreshEqViews()
+                if (stateManager.currentEqUiMode == EqUiMode.TABLE) {
+                    bandToggleGroup.visibility = View.GONE
+                    bandToggleGroup2.visibility = View.GONE
+                }
                 android.widget.Toast.makeText(this, getString(R.string.eq_reset_to_defaults), android.widget.Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
             }
@@ -3606,7 +3609,7 @@ class  MainActivity : AppCompatActivity() {
                 bandToggleManager.setupToggles()
                 // Always have a band selected
                 if (stateManager.parametricEq.getBandCount() > 0) {
-                    val band = stateManager.selectedBandIndex ?: 0
+                    val band = (stateManager.selectedBandIndex ?: 0).coerceIn(0, stateManager.parametricEq.getBandCount() - 1)
                     stateManager.selectedBandIndex = band
                     eqGraphView.setActiveBand(band)
                     updateFilterTypeButtons(band)

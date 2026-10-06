@@ -1325,7 +1325,7 @@ class  MainActivity : AppCompatActivity() {
             channelRBtn.minimumWidth = 0; channelRBtn.minimumHeight = 0
             channelRBtn.setPadding(0, 0, 0, 0)
 
-            // "Both" sits on row 2 just left of L, same size as the other buttons; the label auto-shrinks to fit the narrow cell.
+            // "Both" sits on row 2 just left of L, same size as the other buttons; its one-line label (maxLines=1) auto-shrinks to fit, so long translations never wrap mid-word.
             val bothLp = channelBothBtn.layoutParams as android.widget.FrameLayout.LayoutParams
             bothLp.width = specWidth; bothLp.height = btnHeight
             bothLp.gravity = android.view.Gravity.TOP or android.view.Gravity.START

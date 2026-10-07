@@ -160,6 +160,10 @@
                         android:layout_weight="1"
                         android:gravity="start"
                         android:text="@string/s_43_ms"
+                        android:maxLines="1"
+                        app:autoSizeTextType="uniform"
+                        app:autoSizeMinTextSize="8sp"
+                        app:autoSizeMaxTextSize="12sp"
                         android:textAppearance="@style/TextAppearance.Material3.BodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -169,6 +173,10 @@
                         android:layout_weight="2"
                         android:gravity="center"
                         android:text="@string/s_85_ms"
+                        android:maxLines="1"
+                        app:autoSizeTextType="uniform"
+                        app:autoSizeMinTextSize="8sp"
+                        app:autoSizeMaxTextSize="12sp"
                         android:textAppearance="@style/TextAppearance.Material3.BodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -178,6 +186,10 @@
                         android:layout_weight="2"
                         android:gravity="center"
                         android:text="@string/s_171_ms"
+                        android:maxLines="1"
+                        app:autoSizeTextType="uniform"
+                        app:autoSizeMinTextSize="8sp"
+                        app:autoSizeMaxTextSize="12sp"
                         android:textAppearance="@style/TextAppearance.Material3.BodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -187,6 +199,10 @@
                         android:layout_weight="1"
                         android:gravity="end"
                         android:text="@string/s_341_ms"
+                        android:maxLines="1"
+                        app:autoSizeTextType="uniform"
+                        app:autoSizeMinTextSize="8sp"
+                        app:autoSizeMaxTextSize="12sp"
                         android:textAppearance="@style/TextAppearance.Material3.BodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
@@ -474,7 +490,11 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/off" />
+                        android:text="@string/off"
+                        android:maxLines="1"
+                        app:autoSizeTextType="uniform"
+                        app:autoSizeMinTextSize="9sp"
+                        app:autoSizeMaxTextSize="14sp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/expTvModeServer"
@@ -482,7 +502,11 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/tv" />
+                        android:text="@string/tv"
+                        android:maxLines="1"
+                        app:autoSizeTextType="uniform"
+                        app:autoSizeMinTextSize="9sp"
+                        app:autoSizeMaxTextSize="14sp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/expTvModeClient"
@@ -490,7 +514,11 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/remote" />
+                        android:text="@string/remote"
+                        android:maxLines="1"
+                        app:autoSizeTextType="uniform"
+                        app:autoSizeMinTextSize="9sp"
+                        app:autoSizeMaxTextSize="14sp" />
                 </com.google.android.material.button.MaterialButtonToggleGroup>
 
                 <TextView

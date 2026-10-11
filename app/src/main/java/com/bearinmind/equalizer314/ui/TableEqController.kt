@@ -30,17 +30,10 @@ class TableEqController(
         )
     }
 
-    /** Remove disabled bands that were auto-added for table display */
+    /** Remove disabled bands that were auto-added for table display, from every channel's EQ (issue #132). */
     fun cleanup() {
-        val eq = state.parametricEq
-        // Remove bands in reverse to avoid index shifting
-        for (i in eq.getBandCount() - 1 downTo 0) {
-            if (eq.getBand(i)?.enabled == false) {
-                eq.removeBand(i)
-                if (i < state.bandSlots.size) state.bandSlots.removeAt(i)
-            }
-        }
-        graphView.setParametricEqualizer(eq)
+        state.dropDisabledBands()
+        graphView.setParametricEqualizer(state.parametricEq)
         graphView.setBandSlotLabels(state.bandSlots)
     }
 

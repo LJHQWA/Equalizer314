@@ -263,6 +263,25 @@ class EqStateManager(
         return changed
     }
 
+    /** Drop switched-off bands (Table mode's empty rows) from every channel's EQ, slots in step; only Table shows them (issue #132). */
+    fun dropDisabledBands() {
+        fun strip(eq: ParametricEqualizer, slots: MutableList<Int>) {
+            val aligned = slots.size == eq.getBandCount()
+            for (i in eq.getBandCount() - 1 downTo 0) {
+                if (eq.getBand(i)?.enabled == false) {
+                    eq.removeBand(i)
+                    if (aligned) slots.removeAt(i)
+                }
+            }
+        }
+        strip(bothEq, bothBandSlots)
+        strip(leftEq, leftBandSlots)
+        strip(rightEq, rightBandSlots)
+        strip(sharedEq, sharedBandSlots)
+        val count = parametricEq.getBandCount()
+        selectedBandIndex = selectedBandIndex?.coerceIn(0, (count - 1).coerceAtLeast(0))
+    }
+
     /** TV Mode hook (issues #35/#55): fired on every pushEqUpdate BEFORE the isProcessing early-return — a Remote-mode phone must sync to the TV even when its own DP is off. */
     var onEqPushed: (() -> Unit)? = null
 
@@ -903,14 +922,19 @@ class EqStateManager(
     }.toString()
 
     private fun eqToJson(eq: ParametricEqualizer, slots: List<Int>) = JSONObject().apply {
+        val all = eq.getAllBands()
+        // Table's empty rows aren't edits, so they stay out of history (issue #132).
+        val keep = all.indices.filterNot { EqPreferencesManager.isTableFiller(all[it]) }.ifEmpty { all.indices.toList() }
         put("bands", JSONArray().apply {
-            for (b in eq.getAllBands()) put(JSONObject().apply {
+            for (i in keep) put(JSONObject().apply {
+                val b = all[i]
                 put("f", b.frequency.toDouble()); put("g", b.gain.toDouble()); put("q", b.q)
                 put("t", b.filterType.name); put("e", b.enabled); put("c", b.channel.name)
             })
         })
         // Same rule as rebuildSlots: a stale list (e.g. L/R while CSE is off) must round-trip unchanged, else every undo reads as a new edit.
-        put("slots", JSONArray(if (slots.size == eq.getBandCount()) slots else List(eq.getBandCount()) { it }))
+        val slotList = if (slots.size == all.size) slots else List(all.size) { it }
+        put("slots", JSONArray(keep.map { slotList[it] }))
     }
 
     private fun restoreUndoSnapshot(snap: String) {

@@ -3069,7 +3069,8 @@ class  MainActivity : AppCompatActivity() {
                     put("enabled", b.enabled)
                 })
             }
-            return arr
+            // Table's empty rows never go into a preset (issue #132).
+            return com.bearinmind.equalizer314.state.EqPreferencesManager.withoutTableFillers(arr)
         }
         val json = org.json.JSONObject()
         json.put("preamp", stateManager.preampGainDb)
@@ -3499,10 +3500,6 @@ class  MainActivity : AppCompatActivity() {
         val prevMode = stateManager.currentEqUiMode
         // TV Mode nav sync — hub debounces 150ms, so state is read post-switch.
         com.bearinmind.equalizer314.remote.TvRemoteHub.onLocalEqChanged()
-        // Clean up table mode bands when leaving
-        if (stateManager.currentEqUiMode == EqUiMode.TABLE && mode != EqUiMode.TABLE) {
-            tableController.cleanup()
-        }
         // Save simple EQ gains and restore the advanced EQ when leaving SIMPLE mode
         if (stateManager.currentEqUiMode == EqUiMode.SIMPLE && mode != EqUiMode.SIMPLE) {
             simpleEqController.saveGains()
@@ -3528,6 +3525,8 @@ class  MainActivity : AppCompatActivity() {
                 // Refreshes the DP-band overlay — drawDpBands() reads cached dpCenterFrequencies/dpGains still holding the Simple EQ.
             }
         }
+        // Switched-off bands are Table's empty rows: every other mode drops them, at launch too (issue #132).
+        if (mode != EqUiMode.TABLE) tableController.cleanup()
         // Save the advanced EQ before entering SIMPLE.
         if (mode == EqUiMode.SIMPLE && stateManager.currentEqUiMode != EqUiMode.SIMPLE) {
             val eq = stateManager.parametricEq
@@ -4820,6 +4819,10 @@ class  MainActivity : AppCompatActivity() {
 
     /** Rebind graph + toggles + inputs after the active EQ reference changes (CSE on/off, L/R switch). */
     private fun rebindActiveEq() {
+        // Presets, device switches and undo can carry Table's empty rows; only Table shows them (issue #132).
+        if (stateManager.currentEqUiMode == EqUiMode.PARAMETRIC || stateManager.currentEqUiMode == EqUiMode.GRAPHIC) {
+            stateManager.dropDisabledBands()
+        }
         val eq = stateManager.parametricEq
         eqGraphView.setParametricEqualizer(eq)
         syncPreampUi()

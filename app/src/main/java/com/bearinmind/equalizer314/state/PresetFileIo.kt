@@ -38,6 +38,8 @@ object PresetFileIo {
 
     /** Persist [presetJson] under [name] in the user presets store. */
     fun saveUserPreset(context: Context, name: String, presetJson: JSONObject) {
+        // Exports from older builds can carry Table mode's empty rows (issue #132).
+        EqPreferencesManager.dropTableFillers(presetJson)
         val prefs = context.getSharedPreferences("custom_presets", Context.MODE_PRIVATE)
         val names = prefs.getStringSet("preset_names", emptySet())?.toMutableSet() ?: mutableSetOf()
         names.add(name)

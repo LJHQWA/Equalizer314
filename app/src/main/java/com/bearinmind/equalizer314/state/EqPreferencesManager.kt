@@ -18,6 +18,7 @@ class EqPreferencesManager(context: Context) {
 
     init {
         migrateLegacySimplePresets()
+        stripTableFillersFromPresets()
     }
 
     /** Device → preset binding: stable device key, UI label, preset name (or [DEVICE_PRESET_DISABLED]). */
@@ -57,6 +58,34 @@ class EqPreferencesManager(context: Context) {
                 } else defaultChannel
             }
             eq.isEnabled = true
+        }
+
+        /** Table mode's empty row: a switched-off 0 dB bell, flat even when on, so dropping it never changes the sound (issue #132). */
+        fun isTableFiller(b: ParametricEqualizer.EqualizerBand): Boolean =
+            !b.enabled && b.filterType == BiquadFilter.FilterType.BELL && abs(b.gain) < 0.01f
+
+        private fun isTableFiller(b: JSONObject): Boolean =
+            !b.optBoolean("enabled", true) && b.optString("filterType", "BELL") == "BELL" && abs(b.optDouble("gain", 0.0)) < 0.01
+
+        /** [arr] without Table's empty rows; unchanged when nothing else would be left. */
+        fun withoutTableFillers(arr: JSONArray): JSONArray {
+            val kept = JSONArray()
+            for (i in 0 until arr.length()) {
+                val b = arr.optJSONObject(i)
+                if (b == null || !isTableFiller(b)) kept.put(arr.get(i))
+            }
+            return if (kept.length() == 0) arr else kept
+        }
+
+        /** Strip Table's empty rows from every band list of a preset; true when any were removed. */
+        fun dropTableFillers(preset: JSONObject): Boolean {
+            var changed = false
+            for (key in listOf("bands", "leftBands", "rightBands", "sharedBands")) {
+                val arr = preset.optJSONArray(key) ?: continue
+                val kept = withoutTableFillers(arr)
+                if (kept.length() != arr.length()) { preset.put(key, kept); changed = true }
+            }
+            return changed
         }
 
         /** Reserved presetName for device and app bindings: no EQ while that device/app is active (distinct from "(none)"). */
@@ -801,6 +830,19 @@ class EqPreferencesManager(context: Context) {
         editor.putStringSet("preset_names", existing)
         editor.apply()
         legacyEditor.remove("simple_preset_names").apply()
+    }
+
+    /** One-time pass (issue #132): presets saved in Table mode kept its empty rows, which showed up as ghost bands; an old backup's restore runs it again. */
+    private fun stripTableFillersFromPresets() {
+        if (prefs.getBoolean("tableFillersStripped", false)) return
+        val editor = customPresetsPrefs.edit()
+        for ((key, value) in customPresetsPrefs.all) {
+            if (!key.startsWith("preset_") || value !is String) continue
+            val preset = runCatching { JSONObject(value) }.getOrNull() ?: continue
+            if (dropTableFillers(preset)) editor.putString(key, preset.toString())
+        }
+        editor.apply()
+        prefs.edit().putBoolean("tableFillersStripped", true).apply()
     }
 
     // ---- Device bindings (per-output-device EQ auto-switching) ----

@@ -11,6 +11,9 @@ else()
     set(SIMD_DEF HAVE_SSE)
 endif()
 
+# No compiler banner in .comment: the Windows and Linux NDK clangs word it differently, which breaks F-Droid's byte-for-byte check.
+add_compile_options(-fno-ident)
+
 # Real-time DSP: optimise in debug builds too.
 set(DSP_FLAGS -O3 -ffp-contract=fast)
 

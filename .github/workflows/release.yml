@@ -1,0 +1,163 @@
+# Release pipeline: pushing a version tag (Equalizer314-v0.0.22-beta, …) builds the APK signed with the
+# release key and makes it a draft GitHub release named after the tag, with the fastlane changelog for
+# that versionCode as its notes. Edit the notes on GitHub and publish the draft.
+#
+# The tag must match versionName in app/build.gradle.kts, and the APK must be signed with the key F-Droid
+# expects (AllowedAPKSigningKeys): F-Droid rebuilds every release from source and only publishes it when
+# its build is byte-identical to the APK attached here (Equalizer314-v<version>.apk).
+#
+# A manual run (Actions › Release › Run workflow) is a dry run: it builds the APK at the version in
+# app/build.gradle.kts and keeps it as the run's artifact, and releases nothing.
+name: Release
+
+on:
+  push:
+    tags: ['Equalizer314-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  # never cancel a release halfway; a newer push waits its turn
+  cancel-in-progress: false
+
+env:
+  # SHA-256 of the release certificate, as in F-Droid's AllowedAPKSigningKeys
+  RELEASE_CERT_SHA256: 7a8368d18ad64294f9aadf4b736adcd15cb0cb88c6b9dc2e0bd5f1e461b83e52
+  # same versions as app/build.gradle.kts and F-Droid's recipe (ndk: r27c)
+  NDK_VERSION: 27.2.12479018
+  CMAKE_VERSION: 3.22.1
+
+jobs:
+  apk:
+    name: APK
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      code: ${{ steps.v.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: v
+        name: Resolve version
+        run: |
+          name="$(sed -n 's/^ *versionName = "\(.*\)"$/\1/p' app/build.gradle.kts)"
+          code="$(sed -n 's/^ *versionCode = \([0-9]*\)$/\1/p' app/build.gradle.kts)"
+          if [ -z "$name" ] || [ -z "$code" ]; then
+            echo "::error::versionName / versionCode not found in app/build.gradle.kts"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "${GITHUB_REF_NAME#Equalizer314-v}" != "$name" ]; then
+            echo "::error::tag $GITHUB_REF_NAME doesn't match versionName $name"
+            exit 1
+          fi
+          echo "version=$name" >>"$GITHUB_OUTPUT"
+          echo "code=$code" >>"$GITHUB_OUTPUT"
+          echo "### v$name ($code, \`${GITHUB_SHA::9}\`)" >>"$GITHUB_STEP_SUMMARY"
+
+      # Java 21, like local builds and F-Droid's build server
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install the Android NDK and CMake
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" "cmake;$CMAKE_VERSION" >/dev/null
+
+      - name: Release key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.EQUALIZER314_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.EQUALIZER314_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.EQUALIZER314_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.EQUALIZER314_KEY_PASSWORD }}
+        run: |
+          # Gradle reads ORG_GRADLE_PROJECT_* as the RELEASE_* properties app/build.gradle.kts signs with.
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d >"$RUNNER_TEMP/release.jks"
+            {
+              echo "ORG_GRADLE_PROJECT_RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks"
+              echo "ORG_GRADLE_PROJECT_RELEASE_STORE_PASSWORD=$STORE_PASSWORD"
+              echo "ORG_GRADLE_PROJECT_RELEASE_KEY_ALIAS=$KEY_ALIAS"
+              echo "ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+            } >>"$GITHUB_ENV"
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "::error::No release key: a release is never signed with a throwaway key"
+            exit 1
+          else
+            echo "::warning::No release key: this dry run is signed with a throwaway key"
+            keytool -genkeypair -keystore "$RUNNER_TEMP/release.jks" -storepass android -keypass android \
+              -alias dryrun -keyalg RSA -keysize 2048 -validity 1 -dname "CN=Dry run" >/dev/null
+            {
+              echo "ORG_GRADLE_PROJECT_RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks"
+              echo "ORG_GRADLE_PROJECT_RELEASE_STORE_PASSWORD=android"
+              echo "ORG_GRADLE_PROJECT_RELEASE_KEY_ALIAS=dryrun"
+              echo "ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD=android"
+            } >>"$GITHUB_ENV"
+          fi
+
+      - name: Build
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/Equalizer314-v$VERSION.apk"
+
+      - name: Check the signature
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)apksigner"
+          apk="$(ls dist/*.apk)"
+          certs="$("$apksigner" verify --print-certs "$apk")"
+          sha="$(sed -n 's/.*certificate SHA-256 digest: //p' <<<"$certs" | head -n 1)"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$sha" != "$RELEASE_CERT_SHA256" ]; then
+            echo "::error::$apk is signed with $sha, not the release key F-Droid expects"
+            exit 1
+          fi
+          {
+            echo
+            echo "    $(basename "$apk")"
+            echo "      certificate SHA-256: $sha"
+            echo "      APK SHA-256: $(sha256sum "$apk" | cut -d' ' -f1)"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-apk
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Remove the release key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
+
+  release:
+    name: GitHub Release
+    needs: apk
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: fastlane
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-apk
+          path: dist
+
+      - name: Draft the release
+        env:
+          CODE: ${{ needs.apk.outputs.code }}
+        run: |
+          changelog="fastlane/metadata/android/en-US/changelogs/$CODE.txt"
+          { echo "### What's new"; echo; [ -f "$changelog" ] && cat "$changelog"; } >"$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" -- dist/*
+          echo "Draft **$GITHUB_REF_NAME** is ready: check the notes and publish it." >>"$GITHUB_STEP_SUMMARY"

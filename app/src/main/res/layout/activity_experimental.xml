@@ -532,6 +532,87 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Virtual surround Card (issue #128): HRIR convolution over captured app audio -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/vs_title"
+                            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/vs_desc"
+                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:paddingTop="4dp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/expVsSwitch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/expVsHrirButton"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/vs_choose_hrir"
+                    android:textAllCaps="false"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/expVsStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="8dp"
+                    android:text=""
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    android:textColor="?attr/colorPrimary" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="4dp"
+                    android:text="@string/vs_note"
+                    android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Experimental DP Engine Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

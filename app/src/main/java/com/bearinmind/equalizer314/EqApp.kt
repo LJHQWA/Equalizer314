@@ -15,6 +15,10 @@ class EqApp : Application() {
         registerActivityLifecycleCallbacks(amoledHook)
         // TV Mode: app-wide screen tracking (peer nav-follow) + the remote-controlled touch lock on every activity.
         com.bearinmind.equalizer314.remote.RemoteScrim.install(this)
+        // A killed virtual-surround run leaves other apps muted (issue #128); undo it as soon as the process is back.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            Thread { com.bearinmind.equalizer314.audio.VirtualSurroundService.healStaleMutes(this) }.start()
+        }
     }
 
     // Black (AMOLED) theme: overlay every activity at creation; activities built under an older stamp recreate on resume.

@@ -38,7 +38,29 @@ object AudioPolicyDumpParser {
     }
 
     private fun dumpInternal(context: Context, timeoutMs: Long): Map<String, Set<Int>> {
-        val binder = obtainAudioBinder() ?: return emptyMap()
+        val unmatched = mutableListOf<String>()
+        val uidToSessions = mutableMapOf<Int, MutableSet<Int>>()
+
+        streamDump("audio", timeoutMs) { line ->
+            if (tryParsePowerampLine(line, uidToSessions)) return@streamDump
+            if (tryParseWaveletLine(line, uidToSessions)) return@streamDump
+            // Sample unrecognised lines for format-drift triage (debug builds only).
+            if (BuildConfig.DEBUG && unmatched.size < 20 && line.isNotBlank()) {
+                unmatched.add(line)
+            }
+        } ?: return emptyMap()
+
+        if (BuildConfig.DEBUG && uidToSessions.isEmpty() && unmatched.isNotEmpty()) {
+            Log.d(TAG, "no rows matched; first ${unmatched.size} unmatched lines for triage:")
+            unmatched.forEach { Log.d(TAG, "  | $it") }
+        }
+
+        return resolveUidsToPackages(context, uidToSessions)
+    }
+
+    /** Dump [service] via dumpAsync, feeding each line to [onLine] until EOF or [timeoutMs]; null when the binder is missing or the dump was refused. */
+    private fun streamDump(service: String, timeoutMs: Long, onLine: (String) -> Unit): Unit? {
+        val binder = obtainBinder(service) ?: return null
         val pipe = ParcelFileDescriptor.createPipe()
         val readFd = pipe[0]
         val writeFd = pipe[1]
@@ -50,37 +72,81 @@ object AudioPolicyDumpParser {
             try { writeFd.close() } catch (_: Throwable) {}
         }
 
-        // Bound the blocking read. Caller already runs on a HandlerThread, so stay single-threaded.
+        // Bound the blocking read. Callers already run on a HandlerThread, so stay single-threaded.
         val deadline = System.currentTimeMillis() + timeoutMs
-        val unmatched = mutableListOf<String>()
-        val uidToSessions = mutableMapOf<Int, MutableSet<Int>>()
-
+        var refused = false
         try {
             BufferedReader(FileReader(readFd.fileDescriptor)).use { reader ->
                 while (true) {
                     if (System.currentTimeMillis() > deadline) {
-                        Log.w(TAG, "dump read timed out after ${timeoutMs}ms")
+                        Log.w(TAG, "$service dump read timed out after ${timeoutMs}ms")
                         break
                     }
                     val line = reader.readLine() ?: break
-                    if (tryParsePowerampLine(line, uidToSessions)) continue
-                    if (tryParseWaveletLine(line, uidToSessions)) continue
-                    // Sample unrecognised lines for format-drift triage (debug builds only).
-                    if (BuildConfig.DEBUG && unmatched.size < 20 && line.isNotBlank()) {
-                        unmatched.add(line)
-                    }
+                    // Without DUMP the service writes just this line.
+                    if (line.startsWith("Permission Denial")) { refused = true; break }
+                    onLine(line)
                 }
             }
         } finally {
             try { readFd.close() } catch (_: Throwable) {}
         }
+        return if (refused) null else Unit
+    }
 
-        if (BuildConfig.DEBUG && uidToSessions.isEmpty() && unmatched.isNotEmpty()) {
-            Log.d(TAG, "no rows matched; first ${unmatched.size} unmatched lines for triage:")
-            unmatched.forEach { Log.d(TAG, "  | $it") }
+    // ---- Virtual surround (issue #128): which playing streams playback capture takes ----
+
+    private val CAPTURE_USAGES = listOf("USAGE_MEDIA", "USAGE_GAME", "USAGE_UNKNOWN")
+    private val ATTR_FLAGS: Pattern = Pattern.compile("flags=0x([0-9A-Fa-f]+)")
+    /** AudioAttributes.FLAG_NO_MEDIA_PROJECTION: the player itself refuses capture. */
+    private const val FLAG_NO_MEDIA_PROJECTION = 0x400
+    /** audioserver's per-package log: `- uid= 10123, allowPlaybackCapture=true , packageName=com.foo`. */
+    private val CAPTURE_POLICY: Pattern =
+        Pattern.compile("allowPlaybackCapture=(\\w+)\\s*,\\s*packageName=(\\S+)")
+
+    /** Capturable players: [sessions] = session id → (uid, package); [sessionlessUids] = apps playing capturable audio with no session id (AAudio, SoundPool, Web Audio), which can't be muted per session. */
+    class CaptureSnapshot(val sessions: Map<Int, Pair<Int, String>>, val sessionlessUids: Set<Int>)
+
+    /** Capturable streams (MEDIA / GAME / UNKNOWN usage, no player-level opt-out), our own uid dropped; null when the dump is refused. */
+    fun captureSessions(context: Context, timeoutMs: Long = 1500L): CaptureSnapshot? = try {
+        val uidBySession = mutableMapOf<Int, Int>()
+        val sessionless = mutableSetOf<Int>()
+        streamDump("audio", timeoutMs) { line ->
+            val isRow = line.startsWith("  AudioPlaybackConfiguration ") || line.startsWith("AudioPlaybackConfiguration ")
+            if (!isRow || CAPTURE_USAGES.none { line.contains("usage=$it ") }) return@streamDump
+            val flags = ATTR_FLAGS.matcher(line).takeIf { it.find() }?.group(1)?.toIntOrNull(16) ?: 0
+            if (flags and FLAG_NO_MEDIA_PROJECTION != 0) return@streamDump
+            val uid = POWERAMP_UID_PID.matcher(line).takeIf { it.find() }?.group(1)?.toIntOrNull() ?: return@streamDump
+            val sid = SESSION_ID.matcher(line).takeIf { it.find() }?.group(1)?.toIntOrNull() ?: 0
+            if (sid > 0) uidBySession[sid] = uid else sessionless += uid
+        }?.let {
+            val pm = context.packageManager
+            val ourUid = context.applicationInfo.uid
+            CaptureSnapshot(
+                uidBySession.filterValues { it != ourUid }
+                    .mapNotNull { (sid, uid) -> pm.getPackagesForUid(uid)?.firstOrNull()?.let { sid to (uid to it) } }
+                    .toMap(),
+                sessionless - ourUid,
+            )
         }
+    } catch (t: Throwable) {
+        Log.w(TAG, "capture session dump failed", t)
+        null
+    }
 
-        return resolveUidsToPackages(context, uidToSessions)
+    /** `sessionId:-1` (no session) must parse too, unlike [POWERAMP_SESSION]. */
+    private val SESSION_ID: Pattern = Pattern.compile("(?i)session\\s?id:\\s*(-?\\d+)")
+
+    /** Package → allowPlaybackCapture from media.audio_policy (false = manifest opt-out or targetSdk < 29); null when refused. */
+    fun capturePolicies(timeoutMs: Long = 1500L): Map<String, Boolean>? = try {
+        val out = mutableMapOf<String, Boolean>()
+        streamDump("media.audio_policy", timeoutMs) { line ->
+            val m = CAPTURE_POLICY.matcher(line)
+            if (m.find()) out[m.group(2)!!.removePrefix("shared:")] = m.group(1) == "true"
+        }?.let { out }
+    } catch (t: Throwable) {
+        Log.w(TAG, "capture policy dump failed", t)
+        null
     }
 
     /** Poweramp prefix format; true when the line was consumed (pair added, or a prefix line skipped on purpose). */
@@ -143,17 +209,17 @@ object AudioPolicyDumpParser {
         return out
     }
 
-    /** Cached binder — reused across calls (via `IBinder.isBinderAlive`) until audioserver dies. */
-    @Volatile private var cachedBinder: IBinder? = null
+    /** Cached binders — reused across calls (via `IBinder.isBinderAlive`) until their service dies. */
+    private val cachedBinders = java.util.concurrent.ConcurrentHashMap<String, IBinder>()
 
-    private fun obtainAudioBinder(): IBinder? {
-        cachedBinder?.takeIf { it.isBinderAlive }?.let { return it }
+    /** "audio" emits the AudioPlaybackConfiguration rows on the widest range of builds; "media.audio_policy" has the capture-policy log. */
+    private fun obtainBinder(service: String): IBinder? {
+        cachedBinders[service]?.takeIf { it.isBinderAlive }?.let { return it }
         val serviceManagerClass = Class.forName("android.os.ServiceManager")
         val getService = serviceManagerClass.getMethod("getService", String::class.java)
-        // "audio" emits the AudioPlaybackConfiguration rows on the widest range of builds.
-        val obj = getService.invoke(null, "audio")
+        val obj = getService.invoke(null, service)
         val binder = obj as? IBinder ?: return null
-        cachedBinder = binder
+        cachedBinders[service] = binder
         return binder
     }
 

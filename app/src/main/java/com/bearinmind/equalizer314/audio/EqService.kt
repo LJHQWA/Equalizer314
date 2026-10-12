@@ -708,9 +708,10 @@ class EqService : Service() {
             ACTION_STOP -> {
                 manualOverrideDeviceKey = null
                 dynamicsManager.stop()
-                // Power off is the master switch: per-app effects and a toggled-on reverb stop too (issue #127); Session mode keeps the tracked sessions for the UI.
+                // Power off is the master switch: per-app effects, a toggled-on reverb and virtual surround stop too (issue #127); Session mode keeps the tracked sessions for the UI.
                 if (EqPreferencesManager(this).getAudioRoutingMode() == 1) sessionEffects?.setArmed(false)
                 else sessionEffects?.releaseAll()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) VirtualSurroundService.stop(this)
                 // Persist power-off so tile/notification taps sync when MainActivity is gone.
                 EqPreferencesManager(this).savePowerState(false)
                 setDpRunning(false)
@@ -741,8 +742,9 @@ class EqService : Service() {
                     // Tile tap while running — toggle off, service stays alive for Turn On.
                     manualOverrideDeviceKey = null
                     dynamicsManager.stop()
-                    // Reverb included — power off is the master switch (issue #127).
+                    // Reverb and virtual surround included — power off is the master switch (issue #127).
                     sessionEffects?.releaseAll()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) VirtualSurroundService.stop(this)
                     EqPreferencesManager(this).savePowerState(false)
                     setDpRunning(false)
                     showDpStateToast(started = false)
@@ -933,6 +935,8 @@ class EqService : Service() {
                     routeCoordinator?.endAppOverride()
                     dynamicsManager.stop()
                     setDpRunning(false)
+                    // Virtual surround's mute effects would share the per-app DPs' sessions.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) VirtualSurroundService.stop(this)
                     // Silent stop (mode flip, not a power tap); power state stays and arms the per-app effects below.
                     sendBroadcast(
                         Intent(ACTION_EQ_STOPPED)

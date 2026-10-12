@@ -434,6 +434,29 @@
         <item quantity="one">%1$d point (%2$dHz - %3$dHz)</item>
         <item quantity="other">%1$d points (%2$dHz - %3$dHz)</item>
     </plurals>
+    <!-- Virtual surround (Experimental, issue #128) -->
+    <string name="vs_title">Virtual Surround</string>
+    <string name="vs_desc">In order for this feature to work, audio has to be recorded. Some apps may not allow this unless patched.</string>
+    <string name="vs_choose_hrir">Choose HRIR file</string>
+    <string name="vs_hrir_files">HRIR files</string>
+    <string name="vs_import_file">Import file…</string>
+    <string name="vs_status_starting">Starting…</string>
+    <plurals name="vs_status_running">
+        <item quantity="one">%1$d app processed</item>
+        <item quantity="other">%1$d apps processed</item>
+    </plurals>
+    <string name="vs_note">Only works in apps that announce their audio (or with DUMP permission) - work in progress</string>
+    <string name="vs_status_stopped">Stopped: %1$s</string>
+    <string name="vs_error_revoked">recording was stopped</string>
+    <string name="vs_error_hrir">the HRIR file couldn\'t be loaded</string>
+    <string name="vs_error_capture">audio capture failed</string>
+    <string name="vs_needs_android_10">Virtual Surround needs Android 10 or newer</string>
+    <string name="vs_engine_unavailable">The audio engine isn\'t available on this device</string>
+    <string name="vs_choose_hrir_first">Choose an HRIR file first</string>
+    <string name="vs_needs_system_wide">Switch Channel Input to System-wide first</string>
+    <string name="vs_needs_record_permission">Virtual Surround needs the audio recording permission</string>
+    <string name="vs_unsupported_file">Can\'t use this file (%1$s)</string>
+    <string name="vs_notif_title">Virtual Surround on</string>
     <plurals name="n_targets">
         <item quantity="one">%1$d target</item>
         <item quantity="other">%1$d targets</item>

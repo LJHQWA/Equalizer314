@@ -278,6 +278,12 @@ class EqPreferencesManager(context: Context) {
     fun savePresetAutosave(enabled: Boolean) { prefs.edit().putBoolean("presetAutosave", enabled).apply() }
     fun getPresetAutosave(): Boolean = prefs.getBoolean("presetAutosave", false)
 
+    // Virtual surround (issue #128): the chosen file in HrirLibrary, plus a "14 ch · 48 kHz · 107 ms" line per file.
+    fun getVirtualSurroundHrir(): String? = prefs.getString("vsHrir", null)
+    fun saveVirtualSurroundHrir(name: String?) { prefs.edit().putString("vsHrir", name).apply() }
+    fun getHrirInfo(name: String): String? = prefs.getString("vsHrirInfo_$name", null)
+    fun saveHrirInfo(name: String, info: String?) { prefs.edit().putString("vsHrirInfo_$name", info).apply() }
+
     /** Overwrites a pool preset's JSON only — never touches the name set. */
     fun updateCustomPresetJson(name: String, json: String) {
         customPresetsPrefs.edit().putString("preset_$name", json).apply()

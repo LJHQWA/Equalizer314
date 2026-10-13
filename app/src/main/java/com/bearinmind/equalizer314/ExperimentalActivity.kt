@@ -25,6 +25,7 @@ class ExperimentalActivity : AppCompatActivity() {
         setupMbcVolComp()
         setupPresetAutosave()
         setupTvMode()
+        setupVirtualSurround()
 
         // Hide the legacy "Experimental DP Engine" switch row; the view stays so the card structure holds.
         findViewById<android.view.View>(R.id.expDpModeSwitch)
@@ -530,8 +531,321 @@ class ExperimentalActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    // ---- Virtual surround (issue #128): an HRIR over captured app audio (VirtualSurroundService) ----
+
+    private var vsSyncing = false
+
+    private val vsImport = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) importHrir(uri) }
+
+    private val vsConsent = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        if (result.resultCode == RESULT_OK && data != null &&
+            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
+        ) {
+            androidx.core.content.ContextCompat.startForegroundService(
+                this,
+                android.content.Intent(this, com.bearinmind.equalizer314.audio.VirtualSurroundService::class.java)
+                    .setAction(com.bearinmind.equalizer314.audio.VirtualSurroundService.ACTION_START)
+                    .putExtra(com.bearinmind.equalizer314.audio.VirtualSurroundService.EXTRA_RESULT_CODE, result.resultCode)
+                    .putExtra(com.bearinmind.equalizer314.audio.VirtualSurroundService.EXTRA_RESULT_DATA, data)
+            )
+        }
+        syncVirtualSurround()
+    }
+
+    private val vsRecordPermission = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) requestVsConsent() else {
+            vsToast(getString(R.string.vs_needs_record_permission))
+            syncVirtualSurround()
+        }
+    }
+
+    private val vsStateReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) = syncVirtualSurround()
+    }
+
+    private fun setupVirtualSurround() {
+        findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.expVsSwitch)
+            .setOnCheckedChangeListener { _, isChecked ->
+                if (vsSyncing) return@setOnCheckedChangeListener
+                if (isChecked) startVirtualSurround()
+                else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    com.bearinmind.equalizer314.audio.VirtualSurroundService.stop(this)
+                }
+            }
+        findViewById<android.view.View>(R.id.expVsHrirButton).setOnClickListener { showHrirPicker() }
+        syncVirtualSurround()
+    }
+
+    private fun vsToast(text: String) =
+        android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_LONG).show()
+
+    /** Checks first, then the record permission, then Android's "start recording?" consent; the service starts on consent. */
+    private fun startVirtualSurround() {
+        val problem = when {
+            android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q -> R.string.vs_needs_android_10
+            !com.bearinmind.equalizer314.audio.HrirConvolver.available -> R.string.vs_engine_unavailable
+            !com.bearinmind.equalizer314.state.HrirLibrary.exists(this, eqPrefs.getVirtualSurroundHrir()) -> R.string.vs_choose_hrir_first
+            // Session mode keeps per-app DPs on the very sessions the capture mutes.
+            eqPrefs.getAudioRoutingMode() == 1 -> R.string.vs_needs_system_wide
+            else -> null
+        }
+        if (problem != null) {
+            vsToast(getString(problem))
+            syncVirtualSurround()
+            if (problem == R.string.vs_choose_hrir_first) showHrirPicker()
+            return
+        }
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            vsRecordPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+        } else {
+            requestVsConsent()
+        }
+    }
+
+    private fun requestVsConsent() {
+        val mpm = getSystemService(android.media.projection.MediaProjectionManager::class.java) ?: return
+        // Android 14+: preselect the whole device; a single-app share would capture nothing else.
+        val intent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            mpm.createScreenCaptureIntent(android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay())
+        } else {
+            mpm.createScreenCaptureIntent()
+        }
+        try {
+            vsConsent.launch(intent)
+        } catch (_: Exception) {
+            syncVirtualSurround()
+        }
+    }
+
+    private fun syncVirtualSurround() {
+        val switch = findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.expVsSwitch) ?: return
+        val status = findViewById<android.widget.TextView>(R.id.expVsStatus)
+        val name = eqPrefs.getVirtualSurroundHrir()
+            ?.takeIf { com.bearinmind.equalizer314.state.HrirLibrary.exists(this, it) }
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.expVsHrirButton).text =
+            name ?: getString(R.string.vs_choose_hrir)
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+            switch.isEnabled = false
+            status.text = getString(R.string.vs_needs_android_10)
+            return
+        }
+        val svc = com.bearinmind.equalizer314.audio.VirtualSurroundService
+        vsSyncing = true
+        switch.isChecked = svc.isRunning
+        vsSyncing = false
+        status.text = when (svc.status) {
+            com.bearinmind.equalizer314.audio.VirtualSurroundService.Status.STARTING -> getString(R.string.vs_status_starting)
+            com.bearinmind.equalizer314.audio.VirtualSurroundService.Status.RUNNING ->
+                resources.getQuantityString(R.plurals.vs_status_running, svc.mutedApps, svc.mutedApps)
+            com.bearinmind.equalizer314.audio.VirtualSurroundService.Status.FAILED -> getString(
+                R.string.vs_status_stopped,
+                getString(
+                    when (svc.lastError) {
+                        com.bearinmind.equalizer314.audio.VirtualSurroundService.ERROR_HRIR -> R.string.vs_error_hrir
+                        com.bearinmind.equalizer314.audio.VirtualSurroundService.ERROR_REVOKED -> R.string.vs_error_revoked
+                        else -> R.string.vs_error_capture
+                    }
+                )
+            )
+            // Waiting for an app: the card's note already says which apps work.
+            com.bearinmind.equalizer314.audio.VirtualSurroundService.Status.OFF,
+            com.bearinmind.equalizer314.audio.VirtualSurroundService.Status.NO_SESSIONS -> name?.let { eqPrefs.getHrirInfo(it) } ?: ""
+        }
+    }
+
+    /** File list: tap = use it (a running engine swaps live), ✕ = delete, plus Import. */
+    private fun showHrirPicker() {
+        if (isFinishing) return
+        val density = resources.displayMetrics.density
+        val root = styledDialogRoot()
+        root.addView(styledDialogTitle(getString(R.string.vs_hrir_files)))
+        var dialog: android.app.AlertDialog? = null
+
+        val names = com.bearinmind.equalizer314.state.HrirLibrary.names(this)
+        val current = eqPrefs.getVirtualSurroundHrir()
+        val list = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.VERTICAL }
+        for (name in names) {
+            val row = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                // Baseline alignment pushed the two-line file button down, clipping its bottom outline.
+                isBaselineAligned = false
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = (8 * density).toInt()
+                }
+            }
+            val info = eqPrefs.getHrirInfo(name)
+            val selected = name == current
+            val label = android.text.SpannableStringBuilder(name)
+            if (info != null) {
+                val start = label.length
+                label.append("\n").append(info)
+                label.setSpan(android.text.style.RelativeSizeSpan(0.8f), start, label.length, 0)
+                label.setSpan(android.text.style.ForegroundColorSpan(0xFF888888.toInt()), start, label.length, 0)
+            }
+            row.addView(styledDialogButton("", isCancel = false).apply {
+                text = label
+                setAllCaps(false)
+                // Selected file gets the accent outline, as in the theme and language pickers.
+                if (selected) {
+                    setTextColor(0xFFFFFFFF.toInt())
+                    strokeColor = android.content.res.ColorStateList.valueOf(
+                        com.google.android.material.color.MaterialColors.getColor(root, androidx.appcompat.R.attr.colorPrimary))
+                    strokeWidth = (2 * density).toInt()
+                }
+                layoutParams = android.widget.LinearLayout.LayoutParams(0,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginEnd = (6 * density).toInt()
+                }
+                setOnClickListener {
+                    eqPrefs.saveVirtualSurroundHrir(name)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        com.bearinmind.equalizer314.audio.VirtualSurroundService.reload(this@ExperimentalActivity)
+                    }
+                    dialog?.dismiss()
+                    syncVirtualSurround()
+                }
+            })
+            row.addView(styledDialogButton("✕", isCancel = true).apply {
+                minWidth = 0
+                minimumWidth = 0
+                setPadding(0, paddingTop, 0, paddingBottom)
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    (48 * density).toInt(), android.widget.LinearLayout.LayoutParams.MATCH_PARENT)
+                setOnClickListener {
+                    dialog?.dismiss()
+                    confirmDeleteHrir(name)
+                }
+            })
+            list.addView(row)
+        }
+        // Long lists scroll; the buttons below stay on screen.
+        root.addView(android.widget.ScrollView(this).apply {
+            addView(list)
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                if (names.size > 5) (5 * 64 * density).toInt() else android.widget.LinearLayout.LayoutParams.WRAP_CONTENT)
+        })
+        root.addView(styledDialogDivider())
+
+        val btnRow = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        val cancelBtn = styledDialogButton(getString(R.string.cancel), isCancel = true).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(0,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = (3 * density).toInt()
+            }
+        }
+        val importBtn = styledDialogButton(getString(R.string.vs_import_file), isCancel = false).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(0,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = (3 * density).toInt()
+            }
+        }
+        btnRow.addView(cancelBtn)
+        btnRow.addView(importBtn)
+        root.addView(btnRow)
+
+        val dlg = android.app.AlertDialog.Builder(this, R.style.Theme_Equalizer314_Dialog)
+            .setView(root)
+            .create()
+        dialog = dlg
+        cancelBtn.setOnClickListener { dlg.dismiss() }
+        importBtn.setOnClickListener {
+            dlg.dismiss()
+            // .irs files carry no audio MIME type, so offer everything; the loader validates.
+            try { vsImport.launch(arrayOf("*/*")) } catch (_: Exception) {}
+        }
+        dlg.show()
+    }
+
+    private fun confirmDeleteHrir(name: String) {
+        val density = resources.displayMetrics.density
+        val root = styledDialogRoot()
+        root.addView(styledDialogTitle(getString(R.string.delete_quoted_confirm, name)))
+        root.addView(styledDialogDivider())
+        val btnRow = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+        }
+        val cancelBtn = styledDialogButton(getString(R.string.cancel), isCancel = false).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(0,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = (3 * density).toInt()
+            }
+        }
+        val deleteBtn = styledDialogButton(getString(R.string.delete), isCancel = true).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(0,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = (3 * density).toInt()
+            }
+        }
+        btnRow.addView(cancelBtn)
+        btnRow.addView(deleteBtn)
+        root.addView(btnRow)
+        val dialog = android.app.AlertDialog.Builder(this, R.style.Theme_Equalizer314_Dialog)
+            .setView(root)
+            .create()
+        cancelBtn.setOnClickListener { dialog.dismiss() }
+        deleteBtn.setOnClickListener {
+            com.bearinmind.equalizer314.state.HrirLibrary.delete(this, name)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                com.bearinmind.equalizer314.audio.VirtualSurroundService.reload(this)
+            }
+            dialog.dismiss()
+            syncVirtualSurround()
+        }
+        dialog.show()
+    }
+
+    /** Copy + validate off the main thread; a good file becomes the chosen one. */
+    private fun importHrir(uri: android.net.Uri) {
+        Thread {
+            val result = runCatching { com.bearinmind.equalizer314.state.HrirLibrary.import(this, uri) }
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                result.onSuccess { name ->
+                    eqPrefs.saveVirtualSurroundHrir(name)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        com.bearinmind.equalizer314.audio.VirtualSurroundService.reload(this)
+                    }
+                    vsToast(getString(R.string.imported_quoted, name))
+                    syncVirtualSurround()
+                }.onFailure { e ->
+                    vsToast(
+                        if (e is com.bearinmind.equalizer314.dsp.HrirLoader.UnsupportedHrirException)
+                            getString(R.string.vs_unsupported_file, e.message)
+                        else getString(R.string.import_failed, e.message ?: e.javaClass.simpleName)
+                    )
+                }
+            }
+        }.start()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        androidx.core.content.ContextCompat.registerReceiver(
+            this, vsStateReceiver,
+            android.content.IntentFilter(com.bearinmind.equalizer314.audio.VirtualSurroundService.ACTION_STATE),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        syncVirtualSurround()
+    }
+
     override fun onPause() {
         super.onPause()
+        try { unregisterReceiver(vsStateReceiver) } catch (_: Exception) {}
         // Leaving with TV Mode armed but nothing connected is accidental — reset to Off; a live link survives.
         val hub = com.bearinmind.equalizer314.remote.TvRemoteHub
         val connected = (hub.server?.connectedRemotes() ?: 0) > 0 ||

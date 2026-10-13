@@ -437,4 +437,27 @@
         <item quantity="one">%1$d ponto (%2$dHz - %3$dHz)</item>
         <item quantity="other">%1$d pontos (%2$dHz - %3$dHz)</item>
     </plurals>
+    <!-- Virtual surround (Experimental, issue #128) -->
+    <string name="vs_title">Som surround virtual</string>
+    <string name="vs_desc">Para que este recurso funcione, o áudio precisa ser gravado. Alguns apps podem não permitir isso, a menos que tenham um patch.</string>
+    <string name="vs_choose_hrir">Escolher arquivo HRIR</string>
+    <string name="vs_hrir_files">Arquivos HRIR</string>
+    <string name="vs_import_file">Importar arquivo…</string>
+    <string name="vs_status_starting">Iniciando…</string>
+    <plurals name="vs_status_running">
+        <item quantity="one">%1$d app processado</item>
+        <item quantity="other">%1$d apps processados</item>
+    </plurals>
+    <string name="vs_note">Só funciona em apps que anunciam o próprio áudio (ou com a permissão DUMP) - em desenvolvimento</string>
+    <string name="vs_status_stopped">Parado: %1$s</string>
+    <string name="vs_error_revoked">a gravação foi interrompida</string>
+    <string name="vs_error_hrir">não foi possível carregar o arquivo HRIR</string>
+    <string name="vs_error_capture">a captura de áudio falhou</string>
+    <string name="vs_needs_android_10">O som surround virtual precisa do Android 10 ou mais recente</string>
+    <string name="vs_engine_unavailable">O mecanismo de áudio não está disponível neste aparelho</string>
+    <string name="vs_choose_hrir_first">Escolha um arquivo HRIR primeiro</string>
+    <string name="vs_needs_system_wide">Primeiro mude a Entrada de canal para Todo o sistema</string>
+    <string name="vs_needs_record_permission">O som surround virtual precisa da permissão de gravação de áudio</string>
+    <string name="vs_unsupported_file">Não é possível usar este arquivo (%1$s)</string>
+    <string name="vs_notif_title">Som surround virtual ligado</string>
 </resources>

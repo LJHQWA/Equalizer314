@@ -6,13 +6,15 @@ plugins {
 android {
     namespace = "com.bearinmind.equalizer314"
     compileSdk = 36
+    // Pinned so the native virtual-surround engine (src/main/cpp) builds the same everywhere (F-Droid reproducibility).
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.bearinmind.equalizer314"
         minSdk = 24
         targetSdk = 36
-        versionCode = 26
-        versionName = "0.0.21-beta"
+        versionCode = 27
+        versionName = "0.0.22-beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -54,6 +56,20 @@ android {
 
     buildFeatures {
         buildConfig = true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
+    // AGP 8.2 can't place native libraries on 16 KB boundaries in the APK; compressed ones are extracted at install, so their position doesn't matter.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     // F-Droid rejects APKs containing the "Dependency metadata" extra signing

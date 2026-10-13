@@ -37,6 +37,8 @@ class AudioSessionReceiver : BroadcastReceiver() {
             AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION -> EqService.ACTION_DETACH_SESSION
             else -> return
         }
+        if (forwardAction == EqService.ACTION_ATTACH_SESSION) AnnouncedSessions.open(sessionId, packageName)
+        else AnnouncedSessions.close(sessionId)
 
         val serviceIntent = Intent(context, EqService::class.java).apply {
             action = forwardAction

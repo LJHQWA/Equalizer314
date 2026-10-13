@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Virtual surround (Experimental, issue #128): records other apps' audio through
+         AudioPlaybackCapture, which only runs inside a mediaProjection foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- BootCompletedReceiver listens for ACTION_BOOT_COMPLETED so the
@@ -181,6 +184,12 @@
             android:name="com.bearinmind.equalizer314.audio.EqService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Virtual surround (Experimental, issue #128): capture → HRIR convolution → playback. -->
+        <service
+            android:name="com.bearinmind.equalizer314.audio.VirtualSurroundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
 
         <!-- Quick Settings tile that toggles global DynamicsProcessing
              on / off without opening MainActivity. Routes through

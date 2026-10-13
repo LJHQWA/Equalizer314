@@ -1,0 +1,7 @@
+- New in Experimental: Virtual Surround (issue #128, work in progress). Import a HeSuVi .wav or .irs file (Dolby Atmos, DTS Headphone:X and the rest of the HeSuVi collection) to make headphones sound like speakers in front of you. It records other apps' audio to process it, so it works in apps that announce their audio, or in every app after a one-time adb permission.
+- 简体中文 added, translated by LJHQWA (issue #131).
+- Presets no longer pick up Table mode's empty rows (issue #132). Ghost 0 dB bands already saved in presets are cleaned up automatically on first launch.
+- Turning the EQ off now turns off Environmental Reverb too (issue #127).
+- The screen follows preset changes again (issue #126).
+- Simple mode plays the right EQ after restarts, keeps edits through device switches, and leaving it no longer brings back the old EQ.
+- Fixes: a crash after Reset while a band was selected (issue #129), and translated labels getting cut off.
